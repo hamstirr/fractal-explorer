@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Fractal Infinity — Explorer</title>
+<style>
+  :root{
+    --bg:#0a0b12;
+    --panel:rgba(18,20,32,0.82);
+    --panel-solid:#141627;
+    --stroke:rgba(255,255,255,0.10);
+    --txt:#e8ebff;
+    --txt-dim:#9aa0c0;
+    --accent:#6c8cff;
+    --accent2:#c264ff;
+    --good:#46d8a0;
+    --radius:14px;
+    --shadow:0 18px 50px rgba(0,0,0,0.55);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);
+    font-family:'Segoe UI',system-ui,-apple-system,Roboto,sans-serif;color:var(--txt);
+    -webkit-user-select:none;user-select:none;touch-action:none;}
+  canvas{position:fixed;inset:0;width:100%;height:100%;display:block;cursor:grab;}
+  canvas.dragging{cursor:grabbing;}
+
+  /* ---------- Panel ---------- */
+  #panel{
+    position:fixed;top:16px;left:16px;width:330px;max-height:calc(100vh - 32px);
+    background:var(--panel);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+    border:1px solid var(--stroke);border-radius:var(--radius);box-shadow:var(--shadow);
+    display:flex;flex-direction:column;overflow:hidden;z-index:20;
+    transition:transform .35s cubic-bezier(.4,1.2,.5,1), opacity .3s;
+  }
+  #panel.collapsed{transform:translateX(-360px);opacity:0;pointer-events:none;}
+  .ph{display:flex;align-items:center;gap:10px;padding:15px 16px 13px;border-bottom:1px solid var(--stroke);}
+  .logo{width:26px;height:26px;border-radius:8px;flex:0 0 auto;
+    background:conic-gradient(from 0deg,var(--accent),var(--accent2),var(--good),var(--accent));
+    box-shadow:0 0 16px rgba(108,140,255,.55);}
+  .ph h1{font-size:16px;margin:0;font-weight:600;letter-spacing:.3px;}
+  .ph .sub{font-size:11px;color:var(--txt-dim);margin-top:1px;}
+  .pbody{overflow-y:auto;padding:6px 0 12px;scrollbar-width:thin;scrollbar-color:var(--accent) transparent;}
+  .pbody::-webkit-scrollbar{width:8px}
+  .pbody::-webkit-scrollbar-thumb{background:rgba(108,140,255,.4);border-radius:8px}
+
+  .section{border-bottom:1px solid rgba(255,255,255,0.05);}
+  .shead{display:flex;align-items:center;justify-content:space-between;cursor:pointer;
+    padding:12px 16px;font-size:12.5px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--txt-dim);}
+  .shead:hover{color:var(--txt)}
+  .shead .chev{transition:transform .25s;font-size:10px;opacity:.7}
+  .section.open .chev{transform:rotate(90deg)}
+  .scontent{display:none;padding:4px 16px 16px;}
+  .section.open .scontent{display:block;animation:fade .25s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(-4px)}to{opacity:1}}
+
+  .row{margin:13px 0;}
+  .row:first-child{margin-top:6px}
+  .lbl{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;margin-bottom:7px;color:var(--txt);}
+  .lbl .val{color:var(--accent);font-variant-numeric:tabular-nums;font-weight:600;font-size:11.5px;}
+
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:5px;border-radius:5px;
+    background:linear-gradient(90deg,var(--accent),var(--accent2));outline:none;cursor:pointer;}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+    background:#fff;border:2px solid var(--accent);box-shadow:0 2px 8px rgba(0,0,0,.5);cursor:grab;}
+  input[type=range]::-moz-range-thumb{width:15px;height:15px;border-radius:50%;background:#fff;border:2px solid var(--accent);cursor:grab}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+
+  .chip,select,.btn{font-family:inherit;color:var(--txt);background:rgba(255,255,255,0.05);
+    border:1px solid var(--stroke);border-radius:9px;padding:9px 10px;font-size:12.5px;cursor:pointer;
+    transition:all .18s;text-align:center;}
+  .chip:hover,.btn:hover{background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.22)}
+  .chip.active{background:linear-gradient(135deg,var(--accent),var(--accent2));border-color:transparent;
+    color:#fff;font-weight:600;box-shadow:0 4px 14px rgba(108,140,255,.4)}
+  select{width:100%;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%239aa0c0'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 12px center;padding-right:28px;text-align:left;}
+  option{background:var(--panel-solid);color:var(--txt)}
+
+  .toggle{display:flex;align-items:center;justify-content:space-between;padding:10px 0;}
+  .toggle .tn{font-size:12.5px}
+  .toggle .td{font-size:10.5px;color:var(--txt-dim);margin-top:2px;max-width:200px;line-height:1.35}
+  .sw{position:relative;width:42px;height:23px;border-radius:23px;background:rgba(255,255,255,0.12);
+    cursor:pointer;flex:0 0 auto;transition:background .25s;border:1px solid var(--stroke)}
+  .sw.on{background:linear-gradient(135deg,var(--accent),var(--accent2))}
+  .sw::after{content:'';position:absolute;top:2px;left:2px;width:17px;height:17px;border-radius:50%;
+    background:#fff;transition:transform .25s cubic-bezier(.4,1.4,.5,1);box-shadow:0 2px 5px rgba(0,0,0,.4)}
+  .sw.on::after{transform:translateX(19px)}
+
+  .swatch-row{display:flex;gap:6px;flex-wrap:wrap}
+  .swatch{width:34px;height:34px;border-radius:9px;cursor:pointer;border:2px solid transparent;transition:.15s;position:relative}
+  .swatch:hover{transform:scale(1.08)}
+  .swatch.active{border-color:#fff;box-shadow:0 0 0 2px var(--accent)}
+
+  .btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));border-color:transparent;font-weight:600}
+  .btn.full{width:100%}
+
+  /* ---------- Bottom toolbar ---------- */
+  #dock{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:20;
+    display:flex;gap:6px;padding:7px;background:var(--panel);backdrop-filter:blur(18px);
+    border:1px solid var(--stroke);border-radius:16px;box-shadow:var(--shadow);}
+  .dbtn{width:44px;height:44px;border-radius:11px;border:1px solid transparent;background:rgba(255,255,255,0.04);
+    color:var(--txt);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.18s;position:relative}
+  .dbtn:hover{background:rgba(255,255,255,0.12)}
+  .dbtn.active{background:linear-gradient(135deg,var(--accent),var(--accent2));box-shadow:0 4px 14px rgba(108,140,255,.45)}
+  .dbtn svg{width:21px;height:21px}
+  .dbtn .tip{position:absolute;bottom:54px;left:50%;transform:translateX(-50%);white-space:nowrap;
+    background:var(--panel-solid);border:1px solid var(--stroke);padding:5px 9px;border-radius:7px;font-size:11px;
+    opacity:0;pointer-events:none;transition:.18s;box-shadow:var(--shadow)}
+  .dbtn:hover .tip{opacity:1;transform:translateX(-50%) translateY(-2px)}
+
+  /* ---------- HUD ---------- */
+  #hud{position:fixed;bottom:18px;right:18px;z-index:15;text-align:right;font-size:11px;
+    color:var(--txt-dim);font-variant-numeric:tabular-nums;line-height:1.6;pointer-events:none;
+    text-shadow:0 1px 4px rgba(0,0,0,.8)}
+  #hud b{color:var(--txt);font-weight:600}
+  #hud .zoom{font-size:13px;color:var(--accent)}
+
+  /* mobile menu button when collapsed */
+  #showBtn{position:fixed;top:16px;left:16px;z-index:21;width:46px;height:46px;border-radius:12px;
+    background:var(--panel);border:1px solid var(--stroke);backdrop-filter:blur(18px);color:var(--txt);
+    display:none;align-items:center;justify-content:center;cursor:pointer;box-shadow:var(--shadow)}
+  #panel.collapsed ~ #showBtn{display:flex}
+
+  #toast{position:fixed;top:18px;left:50%;transform:translateX(-50%) translateY(-80px);z-index:40;
+    background:var(--panel-solid);border:1px solid var(--stroke);padding:10px 18px;border-radius:11px;font-size:13px;
+    box-shadow:var(--shadow);transition:transform .4s cubic-bezier(.4,1.4,.5,1);opacity:0;}
+  #toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+
+  /* intro hint */
+  #hint{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:14;text-align:center;
+    color:var(--txt);pointer-events:none;transition:opacity .8s;text-shadow:0 2px 12px rgba(0,0,0,.9)}
+  #hint .big{font-size:15px;font-weight:600;margin-bottom:6px}
+  #hint .sm{font-size:12.5px;color:var(--txt-dim)}
+
+  @media(max-width:560px){
+    #panel{width:calc(100vw - 24px);left:12px;top:12px;max-height:calc(100vh - 90px)}
+    #panel.collapsed{transform:translateX(-110vw)}
+    #hud{bottom:78px}
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<!-- intro hint -->
+<div id="hint">
+  <div class="big">✦ Drag to explore · Scroll / pinch to zoom infinitely</div>
+  <div class="sm">Open the panel for fractals, palettes, auto-zoom &amp; more</div>
+</div>
+
+<!-- Control Panel -->
+<aside id="panel">
+  <div class="ph">
+    <div class="logo"></div>
+    <div>
+      <h1>Fractal Infinity</h1>
+      <div class="sub">Infinite zoom explorer</div>
+    </div>
+    <div style="margin-left:auto"><div class="dbtn" id="collapse" style="width:32px;height:32px">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 6l-6 6 6 6"/></svg>
+    </div></div>
+  </div>
+
+  <div class="pbody" id="pbody">
+
+    <!-- FRACTAL -->
+    <div class="section open" data-sec>
+      <div class="shead">Fractal Type <span class="chev">▶</span></div>
+      <div class="scontent">
+        <div class="grid2" id="fractalBtns">
+          <div class="chip active" data-fractal="0">Mandelbrot</div>
+          <div class="chip" data-fractal="1">Julia</div>
+          <div class="chip" data-fractal="2">Burning Ship</div>
+          <div class="chip" data-fractal="3">Tricorn</div>
+          <div class="chip" data-fractal="4">Celtic</div>
+          <div class="chip" data-fractal="5">Phoenix</div>
+        </div>
+        <div class="row" id="juliaRow" style="display:none">
+          <div class="lbl"><span>Julia C — real</span><span class="val" id="jrVal">-0.800</span></div>
+          <input type="range" id="jr" min="-2" max="2" step="0.001" value="-0.8">
+          <div class="lbl" style="margin-top:10px"><span>Julia C — imag</span><span class="val" id="jiVal">0.156</span></div>
+          <input type="range" id="ji" min="-2" max="2" step="0.001" value="0.156">
+          <div class="btn full" id="juliaPick" style="margin-top:10px">🎯 Pick C from Mandelbrot click</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DETAIL -->
+    <div class="section open" data-sec>
+      <div class="shead">Detail &amp; Quality <span class="chev">▶</span></div>
+      <div class="scontent">
+        <div class="row">
+          <div class="lbl"><span>Iterations</span><span class="val" id="iterVal">300</span></div>
+          <input type="range" id="iter" min="50" max="2000" step="10" value="300">
+        </div>
+        <div class="toggle">
+          <div><div class="tn">Auto detail</div><div class="td">Raise iterations automatically as you zoom deeper</div></div>
+          <div class="sw on" id="autoIter"></div>
+        </div>
+        <div class="row">
+          <div class="lbl"><span>Anti-aliasing</span><span class="val" id="aaVal">2×</span></div>
+          <input type="range" id="aa" min="1" max="4" step="1" value="2">
+        </div>
+      </div>
+    </div>
+
+    <!-- COLOR -->
+    <div class="section open" data-sec>
+      <div class="shead">Color &amp; Palette <span class="chev">▶</span></div>
+      <div class="scontent">
+        <div class="row">
+          <div class="lbl"><span>Palette</span></div>
+          <div class="swatch-row" id="palettes"></div>
+        </div>
+        <div class="row">
+          <div class="lbl"><span>Color density</span><span class="val" id="densVal">1.0</span></div>
+          <input type="range" id="dens" min="0.05" max="6" step="0.05" value="1">
+        </div>
+        <div class="row">
+          <div class="lbl"><span>Color offset</span><span class="val" id="offVal">0.00</span></div>
+          <input type="range" id="off" min="0" max="1" step="0.005" value="0">
+        </div>
+        <div class="row">
+          <div class="lbl"><span>Brightness</span><span class="val" id="briVal">1.0</span></div>
+          <input type="range" id="bri" min="0.2" max="2" step="0.05" value="1">
+        </div>
+        <div class="toggle">
+          <div><div class="tn">Smooth coloring</div><div class="td">Continuous gradient bands</div></div>
+          <div class="sw on" id="smooth"></div>
+        </div>
+        <div class="toggle">
+          <div><div class="tn">Interior glow</div><div class="td">Tint the inside of the set</div></div>
+          <div class="sw" id="glow"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODES -->
+    <div class="section open" data-sec>
+      <div class="shead">Experience Modes <span class="chev">▶</span></div>
+      <div class="scontent">
+        <div class="toggle">
+          <div><div class="tn">🌀 Auto Zoom</div><div class="td">Continuously dive into the fractal</div></div>
+          <div class="sw" id="autoZoom"></div>
+        </div>
+        <div class="row" id="azSpeedRow" style="display:none">
+          <div class="lbl"><span>Zoom speed</span><span class="val" id="azVal">1.0×</span></div>
+          <input type="range" id="azSpeed" min="-3" max="3" step="0.1" value="1">
+        </div>
+        <div class="toggle">
+          <div><div class="tn">🌈 Color Cycling</div><div class="td">Animate palette through the bands</div></div>
+          <div class="sw" id="colorCycle"></div>
+        </div>
+        <div class="row" id="ccSpeedRow" style="display:none">
+          <div class="lbl"><span>Cycle speed</span><span class="val" id="ccVal">1.0×</span></div>
+          <input type="range" id="ccSpeed" min="-4" max="4" step="0.1" value="1">
+        </div>
+        <div class="toggle">
+          <div><div class="tn">🎬 Auto Wander</div><div class="td">Drift toward interesting edges automatically</div></div>
+          <div class="sw" id="wander"></div>
+        </div>
+        <div class="toggle">
+          <div><div class="tn">🖱️ Hover Julia</div><div class="td">Preview Julia set under the cursor (Mandelbrot)</div></div>
+          <div class="sw" id="hoverJulia"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BOOKMARKS -->
+    <div class="section" data-sec>
+      <div class="shead">Locations <span class="chev">▶</span></div>
+      <div class="scontent">
+        <div class="grid2" id="presets"></div>
+        <div class="grid2" style="margin-top:10px">
+          <div class="btn" id="saveLoc">⭐ Save view</div>
+          <div class="btn" id="randomLoc">🎲 Surprise me</div>
+        </div>
+        <div id="savedList" class="grid2" style="margin-top:8px"></div>
+      </div>
+    </div>
+
+  </div>
+</aside>
+
+<div id="showBtn">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+</div>
+
+<!-- Bottom dock -->
+<div id="dock">
+  <div class="dbtn" id="dHome"><span class="tip">Reset view</span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8M5 9v11h14V9"/></svg></div>
+  <div class="dbtn" id="dZoomIn"><span class="tip">Zoom in</span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M11 8v6M8 11h6M20 20l-3.5-3.5"/></svg></div>
+  <div class="dbtn" id="dZoomOut"><span class="tip">Zoom out</span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M8 11h6M20 20l-3.5-3.5"/></svg></div>
+  <div class="dbtn" id="dAuto"><span class="tip">Auto zoom</span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-3-6.7M21 4v4h-4"/></svg></div>
+  <div class="dbtn" id="dColor"><span class="tip">Color cycle</span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 000 18"/></svg></div>
+  <div class="dbtn" id="dShot"><span class="tip">Save image</span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h3l2-3h6l2 3h3v12H4z"/><circle cx="12" cy="13" r="3.5"/></svg></div>
+  <div class="dbtn" id="dFull"><span class="tip">Fullscreen</span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></div>
+</div>
+
+<div id="hud">
+  <div class="zoom" id="hudZoom">1×</div>
+  <div>iter <b id="hudIter">300</b></div>
+  <div id="hudPos">re 0 · im 0</div>
+  <div><span id="hudFps">60</span> fps</div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ============================================================
+   Fractal Infinity — WebGL deep-zoom explorer
+   Uses emulated double-precision (double-float) in the shader
+   to push zoom far past single-float limits.
+============================================================ */
+const cvs = document.getElementById('c');
+const glOpts={preserveDrawingBuffer:true,antialias:false,powerPreference:'high-performance'};
+const gl = cvs.getContext('webgl',glOpts) || cvs.getContext('experimental-webgl',glOpts);
+if(!gl){ document.body.innerHTML='<p style="color:#fff;padding:40px;font:16px sans-serif">WebGL is not supported on this device.</p>'; }
+
+/* ---------- Palettes: arrays of RGB control points ---------- */
+const PALETTES = [
+  {name:'Nebula', c:[[0.02,0.01,0.08],[0.13,0.04,0.40],[0.55,0.10,0.62],[1.0,0.45,0.55],[1.0,0.92,0.70],[0.55,0.85,1.0]]},
+  {name:'Inferno', c:[[0.0,0.0,0.0],[0.30,0.02,0.18],[0.70,0.13,0.10],[0.98,0.50,0.05],[1.0,0.85,0.30],[1.0,1.0,0.92]]},
+  {name:'Ocean', c:[[0.0,0.02,0.10],[0.0,0.15,0.35],[0.0,0.45,0.60],[0.20,0.75,0.78],[0.65,0.95,0.85],[0.95,1.0,0.95]]},
+  {name:'Aurora', c:[[0.01,0.02,0.06],[0.04,0.20,0.20],[0.10,0.55,0.40],[0.40,0.90,0.55],[0.70,0.95,0.85],[0.85,0.70,1.0]]},
+  {name:'Ember', c:[[0.03,0.0,0.0],[0.25,0.03,0.02],[0.6,0.12,0.03],[0.9,0.35,0.05],[1.0,0.7,0.2],[1.0,0.95,0.75]]},
+  {name:'Candy', c:[[0.10,0.02,0.18],[0.55,0.10,0.55],[1.0,0.35,0.70],[1.0,0.65,0.45],[1.0,0.95,0.6],[0.6,0.95,1.0]]},
+  {name:'Mono', c:[[0,0,0],[0.18,0.18,0.20],[0.4,0.42,0.46],[0.65,0.68,0.72],[0.88,0.9,0.94],[1,1,1]]},
+  {name:'Psychedelic', c:[[1.0,0.0,0.4],[1.0,0.7,0.0],[0.3,1.0,0.2],[0.0,0.8,1.0],[0.5,0.0,1.0],[1.0,0.0,0.7]]},
+  {name:'Gold', c:[[0.05,0.03,0.0],[0.25,0.15,0.02],[0.55,0.38,0.08],[0.85,0.65,0.2],[1.0,0.9,0.55],[1.0,1.0,0.9]]},
+  {name:'Ice', c:[[0.02,0.04,0.12],[0.08,0.20,0.40],[0.25,0.45,0.75],[0.55,0.75,0.95],[0.85,0.95,1.0],[1,1,1]]},
+];
+
+/* ---------- State ---------- */
+const S = {
+  cx:-0.5, cy:0.0, scale:3.5,      // view (scale = width in complex plane)
+  fractal:0, iter:300, autoIter:true, aa:2,
+  palette:0, dens:1.0, off:0.0, bri:1.0, smooth:true, glow:false,
+  jr:-0.8, ji:0.156,
+  autoZoom:false, azSpeed:1.0,
+  colorCycle:false, ccSpeed:1.0, cyclePhase:0,
+  wander:false, hoverJulia:false,
+};
+let saved = [];
+
+/* ---------- Shaders ---------- */
+const VERT = `attribute vec2 p; void main(){ gl_Position = vec4(p,0.0,1.0); }`;
+
+const FRAG = `
+precision highp float;
+uniform vec2 uRes;
+uniform vec2 uCenterHi;   // center hi
+uniform vec2 uCenterLo;   // center lo  (double-float emulation)
+uniform float uScale;     // complex width
+uniform int uFractal;
+uniform float uIter;
+uniform int uAA;
+uniform float uDens;
+uniform float uOff;
+uniform float uBri;
+uniform bool uSmooth;
+uniform bool uGlow;
+uniform vec2 uJulia;
+uniform vec3 uPal[6];
+
+// ---- double-float (df64) helpers: each value = hi+lo ----
+vec2 dfSet(float a){ return vec2(a,0.0); }
+vec2 dfAdd(vec2 a, vec2 b){
+  float s = a.x + b.x;
+  float v = s - a.x;
+  float e = (a.x - (s - v)) + (b.x - v) + a.y + b.y;
+  float r = s + e;
+  return vec2(r, e - (r - s));
+}
+vec2 dfMul(vec2 a, vec2 b){
+  float c = 8193.0;
+  float ah = c*a.x; ah = ah + (a.x - ah);
+  float al = a.x - ah;
+  float bh = c*b.x; bh = bh + (b.x - bh);
+  float bl = b.x - bh;
+  float p = a.x*b.x;
+  float e = ((ah*bh - p) + ah*bl + al*bh) + al*bl;
+  e += a.x*b.y + a.y*b.x;
+  float r = p + e;
+  return vec2(r, e - (r - p));
+}
+float dfToF(vec2 a){ return a.x + a.y; }
+
+vec3 palette(float t){
+  t = fract(t);
+  float x = t*5.0;
+  int i = int(floor(x));
+  float f = fract(x);
+  f = f*f*(3.0-2.0*f);
+  vec3 a,b;
+  if(i==0){a=uPal[0];b=uPal[1];}
+  else if(i==1){a=uPal[1];b=uPal[2];}
+  else if(i==2){a=uPal[2];b=uPal[3];}
+  else if(i==3){a=uPal[3];b=uPal[4];}
+  else {a=uPal[4];b=uPal[5];}
+  return mix(a,b,f);
+}
+
+vec3 computePixel(vec2 frag){
+  // map pixel -> complex using double-float for center
+  float aspect = uRes.y/uRes.x;
+  vec2 uv = (frag/uRes - 0.5);
+  vec2 cReHi = dfAdd(vec2(uCenterHi.x,uCenterLo.x), dfSet(uv.x*uScale));
+  vec2 cImHi = dfAdd(vec2(uCenterHi.y,uCenterLo.y), dfSet(uv.y*uScale*aspect));
+  float cre = dfToF(cReHi);
+  float cim = dfToF(cImHi);
+
+  float zr, zi, kr, ki;
+  if(uFractal==1){ zr=cre; zi=cim; kr=uJulia.x; ki=uJulia.y; }   // Julia
+  else { zr=0.0; zi=0.0; kr=cre; ki=cim; }
+
+  float pzr=0.0, pzi=0.0;            // previous (phoenix)
+  float maxI = uIter;
+  float n = 0.0;
+  float zr2=zr*zr, zi2=zi*zi;
+  bool escaped=false;
+  for(int k=0;k<4000;k++){
+    if(float(k)>=maxI) break;
+    float nzr, nzi;
+    if(uFractal==2){            // Burning Ship
+      zr=abs(zr); zi=abs(zi);
+      nzr = zr*zr - zi*zi + kr;
+      nzi = 2.0*zr*zi + ki;
+    } else if(uFractal==3){     // Tricorn (conjugate)
+      nzr = zr2 - zi2 + kr;
+      nzi = -2.0*zr*zi + ki;
+    } else if(uFractal==4){     // Celtic
+      nzr = abs(zr2 - zi2) + kr;
+      nzi = 2.0*zr*zi + ki;
+    } else if(uFractal==5){     // Phoenix
+      nzr = zr2 - zi2 + kr + ki*pzr;
+      nzi = 2.0*zr*zi + ki*pzi;
+      pzr = zr; pzi = zi;
+    } else {                    // Mandelbrot / Julia
+      nzr = zr2 - zi2 + kr;
+      nzi = 2.0*zr*zi + ki;
+    }
+    zr=nzr; zi=nzi;
+    zr2=zr*zr; zi2=zi*zi;
+    n+=1.0;
+    if(zr2+zi2>256.0){ escaped=true; break; }
+  }
+
+  if(!escaped){
+    if(uGlow){
+      float g = (zr2+zi2);
+      return mix(uPal[0]*0.6, uPal[2]*0.5, clamp(g,0.0,1.0));
+    }
+    return uPal[0]*0.0;
+  }
+  float sn = n;
+  if(uSmooth){
+    float log_zn = log(zr2+zi2)*0.5;
+    float nu = log(log_zn/log(2.0))/log(2.0);
+    sn = n + 1.0 - nu;
+  }
+  float t = sn*0.02*uDens + uOff;
+  vec3 col = palette(t);
+  return col*uBri;
+}
+
+void main(){
+  vec3 acc = vec3(0.0);
+  int aa = uAA;
+  if(aa<=1){
+    acc = computePixel(gl_FragCoord.xy);
+  } else {
+    float inv = 1.0/float(aa);
+    for(int sx=0;sx<4;sx++){
+      if(sx>=aa) break;
+      for(int sy=0;sy<4;sy++){
+        if(sy>=aa) break;
+        vec2 off = (vec2(float(sx),float(sy))+0.5)*inv - 0.5;
+        acc += computePixel(gl_FragCoord.xy + off);
+      }
+    }
+    acc /= float(aa*aa);
+  }
+  // gentle tonemap + gamma
+  acc = acc/(acc*0.4+0.85);
+  acc = pow(clamp(acc,0.0,1.0), vec3(0.85));
+  gl_FragColor = vec4(acc,1.0);
+}`;
+
+function compile(type,src){
+  const s=gl.createShader(type); gl.shaderSource(s,src); gl.compileShader(s);
+  if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(s),src);
+  return s;
+}
+const prog = gl.createProgram();
+gl.attachShader(prog,compile(gl.VERTEX_SHADER,VERT));
+gl.attachShader(prog,compile(gl.FRAGMENT_SHADER,FRAG));
+gl.linkProgram(prog);
+gl.useProgram(prog);
+
+const buf=gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+const pLoc=gl.getAttribLocation(prog,'p');
+gl.enableVertexAttribArray(pLoc);
+gl.vertexAttribPointer(pLoc,2,gl.FLOAT,false,0,0);
+
+const U={};
+['uRes','uCenterHi','uCenterLo','uScale','uFractal','uIter','uAA','uDens','uOff','uBri','uSmooth','uGlow','uJulia']
+  .forEach(n=>U[n]=gl.getUniformLocation(prog,n));
+const uPalLoc=gl.getUniformLocation(prog,'uPal');
+
+/* split a double into hi/lo floats */
+function splitD(v){ const hi=Math.fround(v); return [hi, v-hi]; }
+
+/* ---------- Adaptive quality / render-on-demand ----------
+   Idle: full resolution + user anti-aliasing (sharp).
+   Interacting / animating: lower resolution + no AA (fast & smooth).
+   A static image is NOT re-rendered every frame — huge CPU/GPU saving. */
+let DPR=1, BASE_DPR=1;
+let dirty=true;                  // needs a redraw
+let pendingCapture=false;        // export a sharp PNG on next draw
+let interacting=false, interactTimer=null;
+let curScale=-1;                 // currently-applied backing-store scale
+const LOW_SCALE=0.6;             // resolution factor while moving
+
+function invalidate(){ dirty=true; }
+
+function applyCanvasSize(scale){
+  if(scale===curScale) return;
+  curScale=scale;
+  cvs.width = Math.max(1,Math.floor(innerWidth*DPR*scale));
+  cvs.height= Math.max(1,Math.floor(innerHeight*DPR*scale));
+  gl.viewport(0,0,cvs.width,cvs.height);
+}
+function resize(){
+  BASE_DPR = Math.min(window.devicePixelRatio||1, 2);
+  DPR = BASE_DPR;
+  curScale=-1;                   // force re-apply
+  applyCanvasSize(interacting?LOW_SCALE:1);
+  invalidate();
+}
+addEventListener('resize',resize);
+
+let pointerActive=false;
+function beginInteract(){ pointerActive=true; clearTimeout(interactTimer); interactTimer=null; invalidate(); }
+function endInteractSoon(){
+  clearTimeout(interactTimer);
+  interactTimer=setTimeout(()=>{ pointerActive=false; interactTimer=null; invalidate(); }, 170);
+}
+
+DPR = Math.min(window.devicePixelRatio||1, 2); BASE_DPR=DPR;
+applyCanvasSize(1);
+
+/* ---------- Render ---------- */
+let lastT=performance.now(), fps=60, fpsAcc=0, fpsN=0;
+function render(now){
+  const dt=Math.min((now-lastT)/1000,0.05); lastT=now;
+  const animating = S.autoZoom||S.colorCycle||S.wander;
+
+  // auto zoom
+  if(S.autoZoom){
+    const f = Math.pow(0.5, S.azSpeed*dt);
+    S.scale *= f;
+    if(S.scale<1e-13){ S.scale=1e-13; }
+    if(S.scale>8){ S.scale=8; }
+    invalidate();
+  }
+  // color cycle
+  if(S.colorCycle){ S.cyclePhase += S.ccSpeed*dt*0.15; invalidate(); }
+  // wander
+  if(S.wander){ applyWander(dt); invalidate(); }
+
+  // Low quality (lower res + no AA) while the pointer is active or a mode animates.
+  const lowQ = (pointerActive || animating) && !pendingCapture;
+  applyCanvasSize(lowQ?LOW_SCALE:1);
+  interacting = lowQ;
+
+  // Nothing changed and nothing animating -> skip the draw entirely.
+  if(!dirty){ requestAnimationFrame(render); return; }
+  dirty=false;
+
+  // auto iterations from zoom depth (lighter cap while moving)
+  let iter=S.iter;
+  if(S.autoIter){
+    const depth = Math.log2(3.5/S.scale);
+    const cap = lowQ?1200:3000;
+    iter = Math.min(cap, Math.max(S.iter, Math.floor(S.iter + depth*45)));
+  }
+  const aaEff = lowQ?1:S.aa;
+
+  const hi=splitD(S.cx), hiY=splitD(S.cy);
+  gl.uniform2f(U.uRes,cvs.width,cvs.height);
+  gl.uniform2f(U.uCenterHi,hi[0],hiY[0]);
+  gl.uniform2f(U.uCenterLo,hi[1],hiY[1]);
+  gl.uniform1f(U.uScale,S.scale);
+  gl.uniform1i(U.uFractal,S.fractal);
+  gl.uniform1f(U.uIter,iter);
+  gl.uniform1i(U.uAA,aaEff);
+  gl.uniform1f(U.uDens,S.dens);
+  gl.uniform1f(U.uOff,S.off + (S.colorCycle?S.cyclePhase:0));
+  gl.uniform1f(U.uBri,S.bri);
+  gl.uniform1i(U.uSmooth,S.smooth?1:0);
+  gl.uniform1i(U.uGlow,S.glow?1:0);
+  gl.uniform2f(U.uJulia,S.jr,S.ji);
+  // palette
+  const pal=PALETTES[S.palette].c, arr=new Float32Array(18);
+  for(let i=0;i<6;i++){arr[i*3]=pal[i][0];arr[i*3+1]=pal[i][1];arr[i*3+2]=pal[i][2];}
+  gl.uniform3fv(uPalLoc,arr);
+
+  gl.drawArrays(gl.TRIANGLES,0,3);
+
+  // export a sharp frame if one was requested
+  if(pendingCapture){
+    pendingCapture=false;
+    try{
+      const a=document.createElement('a');
+      a.href=cvs.toDataURL('image/png'); a.download='fractal-infinity.png'; a.click();
+      toast('Image saved');
+    }catch(err){ toast('Could not export image'); }
+    invalidate(); // re-render normally next frame
+  }
+
+  // HUD
+  fpsAcc+=1/Math.max(dt,1e-4); fpsN++;
+  if(fpsN>=20){ fps=Math.round(fpsAcc/fpsN); fpsAcc=0; fpsN=0; document.getElementById('hudFps').textContent=fps; }
+  const z=3.5/S.scale;
+  document.getElementById('hudZoom').textContent = formatZoom(z);
+  document.getElementById('hudIter').textContent = Math.round(iter);
+  document.getElementById('hudPos').textContent = 're '+S.cx.toFixed(Math.min(15,Math.max(3,Math.round(Math.log10(z)+2))))+' · im '+S.cy.toFixed(Math.min(15,Math.max(3,Math.round(Math.log10(z)+2))));
+
+  requestAnimationFrame(render);
+}
+function formatZoom(z){
+  if(z<1000) return z.toFixed(1)+'×';
+  if(z<1e6) return (z/1000).toFixed(1)+'K×';
+  if(z<1e9) return (z/1e6).toFixed(1)+'M×';
+  if(z<1e12) return (z/1e9).toFixed(1)+'B×';
+  return z.toExponential(1).replace('e+','e')+'×';
+}
+requestAnimationFrame(render);
+
+/* ---------- Wander mode: edge-following camera ----------
+   A small CPU copy of the fractal escape-time lets the camera "see" where
+   the boundary is, glide ALONG it, and stay glued to the detailed fringe
+   instead of drifting into flat background. */
+function escapeTime(px,py,maxI){
+  let zr,zi,kr,ki,pzr=0,pzi=0;
+  if(S.fractal===1){ zr=px; zi=py; kr=S.jr; ki=S.ji; }
+  else { zr=0; zi=0; kr=px; ki=py; }
+  let zr2=zr*zr, zi2=zi*zi;
+  for(let k=0;k<maxI;k++){
+    let nzr,nzi;
+    if(S.fractal===2){ const ar=Math.abs(zr),ai=Math.abs(zi); nzr=ar*ar-ai*ai+kr; nzi=2*ar*ai+ki; }
+    else if(S.fractal===3){ nzr=zr2-zi2+kr; nzi=-2*zr*zi+ki; }
+    else if(S.fractal===4){ nzr=Math.abs(zr2-zi2)+kr; nzi=2*zr*zi+ki; }
+    else if(S.fractal===5){ nzr=zr2-zi2+kr+ki*pzr; nzi=2*zr*zi+ki*pzi; pzr=zr; pzi=zi; }
+    else { nzr=zr2-zi2+kr; nzi=2*zr*zi+ki; }
+    zr=nzr; zi=nzi; zr2=zr*zr; zi2=zi*zi;
+    if(zr2+zi2>256) return k;
+  }
+  return maxI;
+}
+// "edge-like" score: 1 when a tiny neighborhood straddles inside & outside
+function edgeScore(px,py,e,maxI){
+  let inside=0,out=0,hi=0;
+  const pts=[[0,0],[e,0],[-e,0],[0,e],[0,-e]];
+  for(const o of pts){
+    const t=escapeTime(px+o[0],py+o[1],maxI);
+    if(t>=maxI) inside++; else { out++; hi+=t; }
+  }
+  if(inside===0 || out===0) return 0;          // all flat -> no edge here
+  return 0.4 + 0.6*((hi/out)/maxI);            // weight by boundary depth
+}
+
+let wHeading=Math.random()*Math.PI*2;
+let wvx=Math.cos(wHeading), wvy=Math.sin(wHeading);   // smoothed travel direction
+function applyWander(dt){
+  dt=Math.min(dt,0.033);                              // clamp for stability
+  const depth=Math.log2(3.5/S.scale);
+  const maxI=Math.min(600,Math.max(140,Math.floor(S.iter*0.5+depth*22)));
+  const N=24;
+  const r=S.scale*0.5;            // look-ahead radius
+  const e=S.scale*0.025;          // neighborhood probe size
+  let found=0, vx=0, vy=0;
+  for(let i=0;i<N;i++){
+    const a=i/N*Math.PI*2;
+    const sc=edgeScore(S.cx+Math.cos(a)*r, S.cy+Math.sin(a)*r, e, maxI);
+    if(sc>0){
+      found++;
+      const align=0.5+0.5*Math.cos(a-wHeading);
+      const w=sc*align*align;     // strongly favor forward -> no sudden flips
+      vx+=Math.cos(a)*w; vy+=Math.sin(a)*w;
+    }
+  }
+
+  if(found>0 && (vx||vy)){
+    // low-pass the direction (momentum) so heading turns gradually, no jitter
+    const dl=Math.hypot(vx,vy); vx/=dl; vy/=dl;
+    const k=Math.min(1,dt*2.2);
+    wvx+=(vx-wvx)*k; wvy+=(vy-wvy)*k;
+    const wl=Math.hypot(wvx,wvy)||1; wvx/=wl; wvy/=wl;
+    wHeading=Math.atan2(wvy,wvx);
+
+    // steady pan ALONG the edge (no self-zoom — zoom is Auto Zoom's job)
+    const speed=S.scale*0.16*dt;
+    S.cx+=wvx*speed; S.cy+=wvy*speed;
+
+    // very gentle boundary-lock: keep camera on the detailed fringe.
+    const es=e*1.5;
+    const bv=t=>(t<maxI? t : -maxI*0.5);
+    let gx=bv(escapeTime(S.cx+es,S.cy,maxI))-bv(escapeTime(S.cx-es,S.cy,maxI));
+    let gy=bv(escapeTime(S.cx,S.cy+es,maxI))-bv(escapeTime(S.cx,S.cy-es,maxI));
+    const gm=Math.hypot(gx,gy);
+    if(gm>0){ gx/=gm; gy/=gm; const corr=S.scale*0.06*dt; S.cx+=gx*corr; S.cy+=gy*corr; }
+  } else {
+    // lost the boundary -> slowly turn to search; never changes zoom
+    wHeading+=dt*0.7; wvx=Math.cos(wHeading); wvy=Math.sin(wHeading);
+    const speed=S.scale*0.10*dt;
+    S.cx+=wvx*speed; S.cy+=wvy*speed;
+  }
+}
+
+/* ============================================================
+   Interaction: pan + zoom (mouse, wheel, touch, pinch)
+============================================================ */
+function screenToComplex(px,py){
+  // px,py are CSS pixels (clientX/Y). Independent of backing-store scale.
+  const aspect=innerHeight/innerWidth;
+  const uvx=(px/innerWidth)-0.5;
+  const uvy=(1-py/innerHeight)-0.5; // flip y to match gl_FragCoord
+  return { re:S.cx+uvx*S.scale, im:S.cy+uvy*S.scale*aspect };
+}
+let dragging=false, lastX=0,lastY=0, moved=false;
+cvs.addEventListener('mousedown',e=>{dragging=true;moved=false;lastX=e.clientX;lastY=e.clientY;cvs.classList.add('dragging');hideHint();beginInteract();});
+addEventListener('mousemove',e=>{
+  if(S.hoverJulia && S.fractal===0 && !dragging){ const c=screenToComplex(e.clientX,e.clientY); previewJulia(c); }
+  if(!dragging)return;
+  const dx=e.clientX-lastX, dy=e.clientY-lastY;   // CSS px
+  if(Math.abs(dx)+Math.abs(dy)>2)moved=true;
+  S.cx -= dx/innerWidth*S.scale;
+  S.cy += dy/innerWidth*S.scale;  // width-based to keep square pixels
+  lastX=e.clientX;lastY=e.clientY;
+  invalidate();
+});
+addEventListener('mouseup',e=>{
+  if(dragging && !moved){ handleClick(e.clientX,e.clientY); }
+  dragging=false;cvs.classList.remove('dragging');endInteractSoon();
+});
+cvs.addEventListener('wheel',e=>{
+  e.preventDefault(); hideHint();
+  const c=screenToComplex(e.clientX,e.clientY);
+  const f=Math.pow(1.0015, e.deltaY);
+  beginInteract(); zoomAt(c, f); endInteractSoon();
+},{passive:false});
+
+function zoomAt(c,f){
+  const ns=Math.min(8, Math.max(1e-14, S.scale*f));
+  // keep point c under cursor fixed
+  S.cx = c.re + (S.cx-c.re)*(ns/S.scale);
+  S.cy = c.im + (S.cy-c.im)*(ns/S.scale);
+  S.scale=ns;
+  invalidate();
+}
+function zoomCenter(f){ zoomAt({re:S.cx,im:S.cy}, f); }
+
+let pickJuliaMode=false;
+function handleClick(px,py){
+  const c=screenToComplex(px,py);
+  if(pickJuliaMode){
+    S.jr=c.re; S.ji=c.im; S.fractal=1;
+    document.querySelectorAll('[data-fractal]').forEach(b=>b.classList.toggle('active',+b.dataset.fractal===1));
+    setJuliaUI(); juliaRowVis(); pickJuliaMode=false;
+    document.getElementById('juliaPick').classList.remove('active');
+    toast('Julia set from chosen point'); invalidate();
+  }
+}
+function previewJulia(c){ /* live tweak in hover mode handled by separate small render? keep simple: set julia preview overlay */ }
+
+/* touch */
+let touches={}, pinchStart=0, pinchScale=0, pinchMid=null;
+cvs.addEventListener('touchstart',e=>{
+  hideHint(); beginInteract();
+  for(const t of e.changedTouches) touches[t.identifier]={x:t.clientX,y:t.clientY};
+  const ks=Object.keys(touches);
+  if(ks.length===2){
+    const a=touches[ks[0]],b=touches[ks[1]];
+    pinchStart=Math.hypot(a.x-b.x,a.y-b.y); pinchScale=S.scale;
+    pinchMid={x:(a.x+b.x)/2,y:(a.y+b.y)/2};
+  }
+},{passive:false});
+cvs.addEventListener('touchmove',e=>{
+  e.preventDefault();
+  const ks=Object.keys(touches);
+  if(ks.length===1){
+    const t=e.changedTouches[0], prev=touches[t.identifier];
+    if(prev){
+      const dx=t.clientX-prev.x, dy=t.clientY-prev.y;   // CSS px
+      S.cx-=dx/innerWidth*S.scale; S.cy+=dy/innerWidth*S.scale;
+    }
+    touches[t.identifier]={x:t.clientX,y:t.clientY};
+  } else if(ks.length>=2){
+    for(const t of e.changedTouches){ if(touches[t.identifier]) touches[t.identifier]={x:t.clientX,y:t.clientY}; }
+    const a=touches[ks[0]],b=touches[ks[1]];
+    const d=Math.hypot(a.x-b.x,a.y-b.y);
+    if(pinchStart>0){
+      const c=screenToComplex(pinchMid.x,pinchMid.y);
+      const ns=Math.min(8,Math.max(1e-14, pinchScale*pinchStart/d));
+      S.cx=c.re+(S.cx-c.re)*(ns/S.scale);
+      S.cy=c.im+(S.cy-c.im)*(ns/S.scale);
+      S.scale=ns;
+    }
+  }
+  invalidate();
+},{passive:false});
+cvs.addEventListener('touchend',e=>{
+  for(const t of e.changedTouches) delete touches[t.identifier];
+  if(Object.keys(touches).length<2) pinchStart=0;
+  if(Object.keys(touches).length===0) endInteractSoon();
+},{passive:false});
+
+/* ============================================================
+   UI wiring
+============================================================ */
+const $=id=>document.getElementById(id);
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),1800); }
+function hideHint(){ const h=$('hint'); if(h&&!h._g){h._g=1;h.style.opacity=0;setTimeout(()=>h.remove(),900);} }
+
+/* collapsible sections */
+document.querySelectorAll('[data-sec] .shead').forEach(h=>{
+  h.addEventListener('click',()=>h.parentElement.classList.toggle('open'));
+});
+
+/* fractal buttons */
+$('fractalBtns').addEventListener('click',e=>{
+  const b=e.target.closest('[data-fractal]'); if(!b)return;
+  document.querySelectorAll('[data-fractal]').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active'); S.fractal=+b.dataset.fractal; juliaRowVis(); invalidate();
+});
+function juliaRowVis(){ $('juliaRow').style.display = S.fractal===1?'block':'none'; }
+
+/* sliders helper */
+function slider(id,key,fmt,after){
+  const el=$(id), out=$(id+'Val');
+  const upd=()=>{ S[key]=parseFloat(el.value); if(out)out.textContent=fmt?fmt(S[key]):el.value; if(after)after(); invalidate(); };
+  el.addEventListener('input',upd); upd();
+}
+slider('iter','iter',v=>Math.round(v),()=>{});
+slider('aa','aa',v=>v+'×');
+slider('dens','dens',v=>v.toFixed(2));
+slider('off','off',v=>v.toFixed(3));
+slider('bri','bri',v=>v.toFixed(2));
+slider('jr','jr',v=>v.toFixed(3));
+slider('ji','ji',v=>v.toFixed(3));
+slider('azSpeed','azSpeed',v=>v.toFixed(1)+'×');
+slider('ccSpeed','ccSpeed',v=>v.toFixed(1)+'×');
+function setJuliaUI(){ $('jr').value=S.jr; $('ji').value=S.ji; $('jrVal').textContent=S.jr.toFixed(3); $('jiVal').textContent=S.ji.toFixed(3); }
+
+/* toggles */
+function toggle(id,key,after){
+  const el=$(id);
+  el.classList.toggle('on',!!S[key]);
+  el.addEventListener('click',()=>{ S[key]=!S[key]; el.classList.toggle('on',S[key]); if(after)after(); invalidate(); });
+}
+toggle('autoIter','autoIter');
+toggle('smooth','smooth');
+toggle('glow','glow');
+toggle('autoZoom','autoZoom',()=>{ $('azSpeedRow').style.display=S.autoZoom?'block':'none'; $('dAuto').classList.toggle('active',S.autoZoom); });
+toggle('colorCycle','colorCycle',()=>{ $('ccSpeedRow').style.display=S.colorCycle?'block':'none'; $('dColor').classList.toggle('active',S.colorCycle); });
+toggle('wander','wander');
+toggle('hoverJulia','hoverJulia');
+
+$('juliaPick').addEventListener('click',()=>{
+  S.fractal=0; document.querySelectorAll('[data-fractal]').forEach(b=>b.classList.toggle('active',+b.dataset.fractal===0));
+  juliaRowVis(); pickJuliaMode=true; $('juliaPick').classList.add('active');
+  toast('Click anywhere on the Mandelbrot set');
+});
+
+/* palette swatches */
+const palWrap=$('palettes');
+PALETTES.forEach((p,i)=>{
+  const sw=document.createElement('div'); sw.className='swatch'+(i===0?' active':'');
+  const stops=p.c.map((c,j)=>`rgb(${c.map(v=>Math.round(v*255)).join(',')}) ${j/(p.c.length-1)*100}%`).join(',');
+  sw.style.background=`linear-gradient(135deg,${stops})`; sw.title=p.name;
+  sw.addEventListener('click',()=>{ S.palette=i; document.querySelectorAll('.swatch').forEach(x=>x.classList.remove('active')); sw.classList.add('active'); invalidate(); });
+  palWrap.appendChild(sw);
+});
+
+/* presets / locations */
+const PRESETS=[
+  {n:'Home', x:-0.5,y:0,s:3.5,f:0},
+  {n:'Seahorse', x:-0.745,y:0.113,s:0.02,f:0},
+  {n:'Elephants', x:0.2925,y:0.0149,s:0.012,f:0},
+  {n:'Spiral', x:-0.7453,y:0.1127,s:0.0006,f:0},
+  {n:'Mini-brot', x:-1.7497,y:0,s:0.0008,f:0},
+  {n:'Triple', x:-0.1011,y:0.9563,s:0.012,f:0},
+  {n:'Ship Hull', x:-1.7549,y:-0.0286,s:0.06,f:2},
+  {n:'Dendrite', x:-0.235125,y:0.827215,s:0.004,f:0},
+];
+const presetsWrap=$('presets');
+PRESETS.forEach(p=>{
+  const b=document.createElement('div'); b.className='btn'; b.textContent=p.n;
+  b.addEventListener('click',()=>{ flyTo(p.x,p.y,p.s,p.f); });
+  presetsWrap.appendChild(b);
+});
+
+function flyTo(x,y,s,f){
+  if(f!==undefined){ S.fractal=f; document.querySelectorAll('[data-fractal]').forEach(b=>b.classList.toggle('active',+b.dataset.fractal===f)); juliaRowVis(); }
+  // animate
+  const sx=S.cx,sy=S.cy,ss=S.scale, T=900, t0=performance.now();
+  S.autoZoom=false; $('autoZoom').classList.remove('on'); $('dAuto').classList.remove('active'); $('azSpeedRow').style.display='none';
+  beginInteract();
+  function step(now){
+    let k=Math.min(1,(now-t0)/T); const e=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2;
+    S.cx=sx+(x-sx)*e; S.cy=sy+(y-sy)*e;
+    S.scale=ss*Math.pow(s/ss,e);
+    invalidate();
+    if(k<1)requestAnimationFrame(step); else endInteractSoon();
+  }
+  requestAnimationFrame(step); hideHint();
+}
+
+$('saveLoc').addEventListener('click',()=>{
+  saved.push({x:S.cx,y:S.cy,s:S.scale,f:S.fractal,p:S.palette});
+  renderSaved(); toast('View saved'); persist();
+});
+$('randomLoc').addEventListener('click',()=>{
+  // random point near boundary
+  const pts=PRESETS.slice(1);
+  const base=pts[Math.floor(Math.random()*pts.length)];
+  const jx=(Math.random()-0.5)*base.s*4, jy=(Math.random()-0.5)*base.s*4;
+  S.palette=Math.floor(Math.random()*PALETTES.length);
+  document.querySelectorAll('.swatch').forEach((x,i)=>x.classList.toggle('active',i===S.palette));
+  flyTo(base.x+jx, base.y+jy, base.s*(0.3+Math.random()), base.f);
+});
+function renderSaved(){
+  const w=$('savedList'); w.innerHTML='';
+  saved.forEach((v,i)=>{
+    const b=document.createElement('div'); b.className='btn'; b.textContent='📍 '+(i+1);
+    b.addEventListener('click',()=>{ S.palette=v.p; document.querySelectorAll('.swatch').forEach((x,k)=>x.classList.toggle('active',k===v.p)); flyTo(v.x,v.y,v.s,v.f); });
+    b.addEventListener('contextmenu',e=>{e.preventDefault(); saved.splice(i,1); renderSaved(); persist();});
+    w.appendChild(b);
+  });
+}
+function persist(){ try{ localStorage.setItem('fi_saved',JSON.stringify(saved)); }catch(e){} }
+try{ const s=localStorage.getItem('fi_saved'); if(s){saved=JSON.parse(s);renderSaved();} }catch(e){}
+
+/* dock buttons */
+$('dHome').addEventListener('click',()=>flyTo(-0.5,0,3.5,0));
+$('dZoomIn').addEventListener('click',()=>zoomCenter(0.5));
+$('dZoomOut').addEventListener('click',()=>zoomCenter(2));
+$('dAuto').addEventListener('click',()=>{ $('autoZoom').click(); });
+$('dColor').addEventListener('click',()=>{ $('colorCycle').click(); });
+$('dShot').addEventListener('click',saveImage);
+$('dFull').addEventListener('click',()=>{ if(!document.fullscreenElement)document.documentElement.requestFullscreen?.(); else document.exitFullscreen?.(); });
+
+function saveImage(){
+  // request a full-resolution frame; capture happens right after it draws
+  pendingCapture=true; invalidate();
+}
+
+/* panel collapse */
+$('collapse').addEventListener('click',()=>$('panel').classList.add('collapsed'));
+$('showBtn').addEventListener('click',()=>$('panel').classList.remove('collapsed'));
+
+/* keyboard shortcuts */
+addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;
+  switch(e.key){
+    case '+': case '=': zoomCenter(0.6); break;
+    case '-': case '_': zoomCenter(1.7); break;
+    case 'a': $('autoZoom').click(); break;
+    case 'c': $('colorCycle').click(); break;
+    case 'r': flyTo(-0.5,0,3.5,0); break;
+    case 's': saveImage(); break;
+    case 'h': $('panel').classList.toggle('collapsed'); break;
+    case 'ArrowUp': S.cy+=S.scale*0.05; invalidate(); break;
+    case 'ArrowDown': S.cy-=S.scale*0.05; invalidate(); break;
+    case 'ArrowLeft': S.cx-=S.scale*0.05; invalidate(); break;
+    case 'ArrowRight': S.cx+=S.scale*0.05; invalidate(); break;
+  }
+});
+
+juliaRowVis();
+</script>
+</body>
+</html>
