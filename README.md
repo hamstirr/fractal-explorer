@@ -1,6 +1,7 @@
 # ✨ Fractal Infinity
 
 A GPU-accelerated fractal deep-zoom explorer in a single HTML file. Everything is rendered in a WebGL fragment shader, so zooming and panning stay smooth at full resolution.
+
 **▶ Live demo:** https://hamstirr.github.io/fractal-explorer/
 
 ## Features
